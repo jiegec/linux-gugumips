@@ -1,0 +1,12 @@
+if MACH_GUGUMIPS
+
+choice
+    prompt "Machine type"
+    default GUGUMIPS_NSCSCC
+
+config GUGUMIPS_NSCSCC
+    bool "GuGuMIPSSoC for NSCSCC"
+ 
+endchoice
+
+endif
