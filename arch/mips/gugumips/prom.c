@@ -5,7 +5,7 @@
 #define EARLY_PRINTK_UART_BASE 0xbfd00000
 #endif
 
-void __init prom_putchar(char c)
+void prom_putchar(char c)
 {
 #if IS_ENABLED(CONFIG_GUGUMIPS_NSCSCC)
 	while ((readl((uint32_t *)(EARLY_PRINTK_UART_BASE + 0x8))) & 0x8)
