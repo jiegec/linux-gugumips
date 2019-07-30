@@ -10,23 +10,23 @@
 
 void __init plat_mem_setup(void)
 {
-	strlcpy(arcs_cmdline, boot_command_line, COMMAND_LINE_SIZE);
-	__dt_setup_arch(__dtb_start);
+    strlcpy(arcs_cmdline, boot_command_line, COMMAND_LINE_SIZE);
+    __dt_setup_arch(__dtb_start);
 }
 
 void __init device_tree_init(void)
 {
-	if (!initial_boot_params)
-		return;
+    if (!initial_boot_params)
+        return;
 
-	unflatten_and_copy_device_tree();
+    unflatten_and_copy_device_tree();
 }
 
 void __init plat_time_init(void) {
-	struct device_node *np;
-	struct clk *clk;
-	of_clk_init(NULL);
-	np = of_get_cpu_node(0, NULL);
+    struct device_node *np;
+    struct clk *clk;
+    of_clk_init(NULL);
+    np = of_get_cpu_node(0, NULL);
     if (!np) {
         pr_err("Failed to get CPU node\n");
         return;
@@ -39,31 +39,36 @@ void __init plat_time_init(void) {
 
     mips_hpt_frequency = clk_get_rate(clk);
     clk_put(clk);
-	timer_probe();
+    timer_probe();
 }
 
 void __init arch_init_irq(void) {
-	struct device_node *intc_node;
+    unsigned int sr;
+    struct device_node *intc_node;
 
-	intc_node = of_find_compatible_node(NULL, NULL,
-					    "mti,cpu-interrupt-controller");
-	of_node_put(intc_node);
+    sr = set_c0_status(ST0_BEV);
+    write_c0_ebase((u32)ebase);
+    write_c0_status(sr);
 
-	irqchip_init();
+    intc_node = of_find_compatible_node(NULL, NULL,
+                        "mti,cpu-interrupt-controller");
+    of_node_put(intc_node);
+
+    irqchip_init();
 }
 
 const char *get_system_type(void)
 {
-	const char *str;
-	int err;
+    const char *str;
+    int err;
 
-	err = of_property_read_string_index(of_root, "compatible", 0, &str);
-	if (!err)
-		return str;
+    err = of_property_read_string_index(of_root, "compatible", 0, &str);
+    if (!err)
+        return str;
 
-	return "Unknown";
+    return "Unknown";
 }
 
 unsigned int get_c0_compare_int(void) {
-	return CP0_LEGACY_COMPARE_IRQ;
+    return CP0_LEGACY_COMPARE_IRQ;
 }
