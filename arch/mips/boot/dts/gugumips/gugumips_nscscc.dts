@@ -47,8 +47,19 @@
         compatible = "simple-bus";
         #address-cells = <1>;
         #size-cells = <1>;
-        #interrupt-cells = <1>;
         ranges;
+
+        axi_intc_0: interrupt-controller@1fe00000 {
+            #interrupt-cells = <1>;
+            compatible = "xlnx,xps-intc-1.00.a";
+            interrupt-controller;
+            interrupt-parent = <&cpuintc>;
+            interrupts = <2>;
+            reg = <0x1fe00000 0x1000>;
+            xlnx,kind-of-intr = <0x27>;
+            xlnx,num-intr-inputs = <0x6>;
+        };
+
 
         serial0: serial@1fd00000 {
             device_type = "serial";
@@ -57,7 +68,7 @@
             current-speed = <115200>;
             clock-frequency = <50000000>;
             interrupt-parent = <&axi_intc_0>;
-            interrupts = <1 0>;
+            interrupts = <1>;
         };
 
         lcd0: lcd@1f600000 {
@@ -70,7 +81,7 @@
             #size-cells = <0>;
             compatible = "xlnx,xps-spi-2.00.a";
             interrupt-parent = <&axi_intc_0>;
-            interrupts = <5 0>;
+            interrupts = <5>;
             reg = <0x1f900000 0x10000>;
             xlnx,num-ss-bits = <0x1>;
             num-cs = <0x1>;
@@ -101,17 +112,6 @@
             };
         };
 
-        axi_intc_0: interrupt-controller@1fe00000 {
-            #interrupt-cells = <2>;
-            compatible = "xlnx,xps-intc-1.00.a";
-            interrupt-controller;
-            interrupt-parent = <&cpuintc>;
-            interrupts = <2 0>;
-            reg = <0x1fe00000 0x1000>;
-            xlnx,kind-of-intr = <0x1>;
-            xlnx,num-intr-inputs = <0x6>;
-        };
-
         axi_ethernetlite: ethernet@1fb00000 {
             compatible = "xlnx,xps-ethernetlite-3.00.a";
             device_type = "network";
@@ -128,7 +128,7 @@
             xlnx,tx-ping-pong = <0x1>;
             xlnx,use-internal = <0x0>;
             interrupt-parent = <&axi_intc_0>;
-            interrupts = <2 0>;
+            interrupts = <2>;
             mdio {
                 #address-cells = <1>;
                 #size-cells = <0>;
@@ -143,7 +143,7 @@
             compatible = "altr,ps2-1.0";
             reg = <0x1f800000 0x1000>;
             interrupt-parent = <&axi_intc_0>;
-            interrupts = <3 0>;
+            interrupts = <3>;
         };
     };
 };
