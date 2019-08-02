@@ -32,13 +32,13 @@ static int majorNumber;
 static struct class *nt35510_class;
 
 static struct nt35510_drvdata {
+	struct device *device;
 	struct cdev cdev;
 	int isOpen;
 	phys_addr_t regs_phys;
 	void __iomem *regs;
 	u32 xres, yres;
 	loff_t curr_off;
-
 } * nt35510s[MAX_LCD_NUM];
 
 static struct nt35510_drvdata default_nt35510_drvdata = {
@@ -51,7 +51,7 @@ static void nt35510_out32(const struct nt35510_drvdata *drvdata, u32 offset,
 			  u32 val)
 {
 	iowrite32(val, drvdata->regs + (offset << 2));
-	//pr_info("nt35510_out32: off=0x%02x val=0x%04x\n", offset, val);
+	dev_dbg(drvdata->device, "nt35510_out32: off=0x%02x val=0x%04x\n", offset, val);
 }
 
 static void nt35510_init(const struct nt35510_drvdata *drvdata)
@@ -477,7 +477,7 @@ static void nt35510_init(const struct nt35510_drvdata *drvdata)
 }
 
 static int nt35510_seek_point(const struct nt35510_drvdata *drvdata, u32 x,
-			      u32 y)
+				  u32 y)
 {
 	if (x < drvdata->xres && y < drvdata->yres) {
 		nt35510_out32(drvdata, NT35510_INST_OFFSET, 0x2A00);
@@ -521,7 +521,7 @@ static int nt35510_release(struct inode *inode, struct file *file)
 }
 
 static ssize_t nt35510_write(struct file *file, const char __user *buf,
-			      size_t size, loff_t *poss)
+				  size_t size, loff_t *poss)
 {
 	struct nt35510_drvdata *drvdata = file->private_data;
 	unsigned long p = drvdata->curr_off / BYTES_PER_PIXEL;
@@ -529,7 +529,7 @@ static ssize_t nt35510_write(struct file *file, const char __user *buf,
 	u16 *data;
 	int ret = 0;
 
-	//pr_info("nt35510_write: p=%ld, count=%d\n", p, count);
+	dev_dbg(drvdata->device, "nt35510_write: p=%ld, count=%d", p, count);
 	if (p >= drvdata->xres * drvdata->yres)
 		return 0;
 	if (count > drvdata->xres * drvdata->yres - p)
@@ -551,7 +551,7 @@ static ssize_t nt35510_write(struct file *file, const char __user *buf,
 			nt35510_out32(drvdata, NT35510_INST_OFFSET, 0x2C00);
 			for (i = 0; i < count; i++) {
 				nt35510_out32(drvdata, NT35510_DATA_OFFSET,
-					      data[i]);
+						  data[i]);
 			}
 			ret = BYTES_PER_PIXEL * count;
 		} else {
@@ -561,7 +561,7 @@ static ssize_t nt35510_write(struct file *file, const char __user *buf,
 		drvdata->curr_off += BYTES_PER_PIXEL * count;
 	}
 	kfree(data);
-	//pr_info("nt35510_write: ret=%d\n", ret);
+	dev_dbg(drvdata->device, "nt35510_write: ret=%d", ret);
 	return ret;
 }
 
@@ -584,12 +584,12 @@ static loff_t nt35510_llseek(struct file *file, loff_t offset, int whence)
 	default:
 		return -EINVAL;
 	}
-	//pr_info("nt35510_llseek: opos=%lld, npos=%lld, tol=%d\n", file->f_pos, newpos, drvdata->xres * drvdata->yres * BYTES_PER_PIXEL);
+	dev_dbg(drvdata->device, "nt35510_llseek: opos=%lld, npos=%lld, tol=%d\n", file->f_pos, newpos, drvdata->xres * drvdata->yres * BYTES_PER_PIXEL);
 	if (newpos % BYTES_PER_PIXEL != 0) {
 		return -EINVAL;
 	}
 	if ((newpos < 0) ||
-	    (newpos >= drvdata->xres * drvdata->yres * BYTES_PER_PIXEL))
+		(newpos >= drvdata->xres * drvdata->yres * BYTES_PER_PIXEL))
 		return -EINVAL;
 
 	file->f_pos = newpos;
@@ -609,6 +609,7 @@ static int nt35510_of_probe(struct platform_device *pdev)
 {
 	struct nt35510_drvdata *drvdata;
 	struct resource *res;
+	struct device *device;
 
 	drvdata = devm_kzalloc(&pdev->dev, sizeof(*drvdata), GFP_KERNEL);
 	if (!drvdata)
@@ -625,11 +626,12 @@ static int nt35510_of_probe(struct platform_device *pdev)
 	nt35510_init(drvdata);
 	// Register the device driver
 
-	device_create(nt35510_class, NULL, MKDEV(majorNumber, 0), NULL,
-		      "nt35510");
+	device = device_create(nt35510_class, NULL, MKDEV(majorNumber, 0), NULL,
+			  "nt35510");
+	drvdata->device = device;
 	nt35510s[0] = drvdata;
-	printk(KERN_INFO "nt35510: device created correctly, reg=%p\n",
-	       drvdata->regs); // Made it! device was initialized
+	dev_info(device, "nt35510: device created correctly, reg=%p\n",
+		   drvdata->regs); // Made it! device was initialized
 
 	return 0;
 }
@@ -678,22 +680,20 @@ static char *nt35510_devnode(struct device *dev, umode_t *mode)
 
 static int __init nt35510_module_init(void)
 {
-	printk(KERN_INFO "nt35510: Initializing the nt35510\n");
+	pr_info("nt35510: Initializing the nt35510\n");
 
 	// Try to dynamically allocate a major number for the device -- more difficult but worth it
 	majorNumber = register_chrdev(0, DRV_NAME, &fops);
 	if (majorNumber < 0) {
-		printk(KERN_ALERT
-		       "nt35510 failed to register a major number\n");
+		pr_alert("nt35510 failed to register a major number\n");
 		return majorNumber;
 	}
 	nt35510_class = class_create(THIS_MODULE, "lcd");
 	nt35510_class->devnode = nt35510_devnode;
 	if (IS_ERR(nt35510_class))
 		return PTR_ERR(nt35510_class);
-	printk(KERN_INFO
-	       "nt35510: registered correctly with major number %d\n",
-	       majorNumber);
+	pr_info("nt35510: registered correctly with major number %d\n",
+		   majorNumber);
 
 	return 0;
 }
@@ -702,7 +702,7 @@ static void __exit nt35510_module_exit(void)
 	class_unregister(nt35510_class);
 	class_destroy(nt35510_class);
 	unregister_chrdev(majorNumber, DRV_NAME);
-	printk(KERN_INFO "nt35510: unregistered\n");
+	pr_info("nt35510: unregistered");
 }
 
 module_init(nt35510_module_init);

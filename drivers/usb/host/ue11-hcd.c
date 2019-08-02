@@ -332,11 +332,11 @@ static void dbg_decode_setup_packet(uint8_t *p)
 
 	pr_debug("Debug: SETUP PACKET\n");
 	pr_debug("       bRequestType 0x%x (%s)\n", ctrl->bRequestType,
-	       dbg_get_ctrl_req_type_str(ctrl->bRequestType));
+		   dbg_get_ctrl_req_type_str(ctrl->bRequestType));
 	pr_debug("       bRequest 0x%x (%s)\n", ctrl->bRequest,
-	       dbg_get_ctrl_req_str(ctrl->bRequest));
+		   dbg_get_ctrl_req_str(ctrl->bRequest));
 	pr_debug("       wValue 0x%x, wIndex 0x%x, wLength %d\n", ctrl->wValue,
-	       ctrl->wIndex, ctrl->wLength);
+		   ctrl->wIndex, ctrl->wLength);
 }
 
 //-----------------------------------------------------------------
@@ -498,7 +498,7 @@ static void status_packet(struct ue11 *ue11, struct ue11h_ep *ep,
 		pr_debug("USB: Send STATUS (OUT)\n");
 
 		pr_debug("TOKEN: OUT (STATUS)");
-        pr_debug("  DEV %d EP %d\n", device_addr, endpoint);
+		pr_debug("  DEV %d EP %d\n", device_addr, endpoint);
 
 		// Transfer data length (zero length packet - just PID)
 		writel(0, ue11->reg_base + USB_XFER_DATA);
@@ -561,7 +561,7 @@ static void in_packet(struct ue11 *ue11, struct ue11h_ep *ep, struct urb *urb)
 	uint32_t endpoint = usb_pipeendpoint(urb->pipe);
 
 	pr_debug("USB: IN Request EP %x (%d/%d)\n", endpoint,
-			     urb->actual_length, urb->transfer_buffer_length);
+				 urb->actual_length, urb->transfer_buffer_length);
 
 	pr_debug("TOKEN: IN");
 	pr_debug("  DEV %d EP %d\n", device_addr, endpoint);
@@ -607,7 +607,7 @@ static void out_packet(struct ue11 *ue11, struct ue11h_ep *ep, struct urb *urb)
 
 	// Limit transmit length to max packet size
 	len = min_t(u32, ep->maxpacket,
-		    urb->transfer_buffer_length - urb->actual_length);
+			urb->transfer_buffer_length - urb->actual_length);
 
 	pr_debug("TOKEN: OUT");
 	pr_debug("  DEV %d EP %d\n", device_addr, endpoint);
@@ -617,7 +617,7 @@ static void out_packet(struct ue11 *ue11, struct ue11h_ep *ep, struct urb *urb)
 			  USB_PID_DATA1 :
 			  USB_PID_DATA0;
 
-	pr_info("USB: OUT EP %x, LEN %d, PID=%x\n", endpoint, len, request);
+	dev_info(ue11_to_hcd(ue11)->self.controller, "USB: OUT EP %x, LEN %d, PID=%x\n", endpoint, len, request);
 
 	// Load DATAx transfer into address 0+
 	pr_debug(" Tx: %02x", request);
@@ -653,7 +653,7 @@ static inline void enable_sof_interrupt(struct ue11 *ue11)
 {
 	if (ue11->irq_enable & (1 << USB_IRQ_MASK_SOF_SHIFT))
 		return;
-	pr_info("USB: Enable SOF");
+	dev_info(ue11_to_hcd(ue11)->self.controller, "USB: Enable SOF");
 	ue11->irq_enable |= (1 << USB_IRQ_MASK_SOF_SHIFT);
 }
 //-----------------------------------------------------------------
@@ -663,7 +663,7 @@ static inline void disable_sof_interrupt(struct ue11 *ue11)
 {
 	if (!(ue11->irq_enable & (1 << USB_IRQ_MASK_SOF_SHIFT)))
 		return;
-	pr_info("USB: Disable SOF");
+	dev_info(ue11_to_hcd(ue11)->self.controller, "USB: Disable SOF");
 	ue11->irq_enable &= ~(1 << USB_IRQ_MASK_SOF_SHIFT);
 }
 //-----------------------------------------------------------------
@@ -697,8 +697,8 @@ static void start_transfer(struct ue11 *ue11)
 					  schedule);
 		else {
 			/* could set up the first fullspeed periodic
-             * transfer for the next frame ...
-             */
+			 * transfer for the next frame ...
+			 */
 			return;
 		}
 
@@ -812,21 +812,21 @@ static void process_transfer_result(struct ue11 *ue11, struct ue11h_ep *ep)
 
 	status = readl(ue11->reg_base + USB_RX_STAT);
 	response = ((status >> USB_RX_STAT_RESP_BITS_SHIFT) &
-		    USB_RX_STAT_RESP_BITS_MASK);
+			USB_RX_STAT_RESP_BITS_MASK);
 
 	pr_debug("  STAT: %08x\n", status);
 	pr_debug("  RESP: %08x\n", response);
 
 	// Request still pending
 	if (status & (1 << USB_RX_STAT_START_PEND_SHIFT)) {
-		pr_info("USB: request still pending");
+		dev_info(ue11_to_hcd(ue11)->self.controller, "USB: request still pending");
 		return;
 	}
 
 	// CRC error
 	if (status & (1 << USB_RX_STAT_CRC_ERR_SHIFT)) {
 		// Response PID field will be zero!
-		pr_info("USB: CRC error detected (last pid=%x)", ep->nextpid);
+		dev_info(ue11_to_hcd(ue11)->self.controller, "USB: CRC error detected (last pid=%x)", ep->nextpid);
 		return;
 	}
 
@@ -842,7 +842,7 @@ static void process_transfer_result(struct ue11 *ue11, struct ue11h_ep *ep)
 
 	// IN request sent and response received
 	if (((ep->nextpid == USB_PID_IN) || (ep->nextpid == USB_PID_ACK)) &&
-	    (response == USB_PID_DATA0 || response == USB_PID_DATA1)) {
+		(response == USB_PID_DATA0 || response == USB_PID_DATA1)) {
 		// TODO: Check DATAx is correct
 
 		// Convert to ACK if all is well...
@@ -875,12 +875,12 @@ static void process_transfer_result(struct ue11 *ue11, struct ue11h_ep *ep)
 					ep->nextpid = USB_PID_ACK;
 
 				/* some bulk protocols terminate OUT transfers
-                 * by a short packet, using ZLPs not padding.
-                 */
+				 * by a short packet, using ZLPs not padding.
+				 */
 				else if (ep->length < ep->maxpacket ||
 					 !(urb->transfer_flags &
 					   URB_ZERO_PACKET)) {
-                    pr_info("USB: OUT EP %x Complete",
+					dev_info(ue11_to_hcd(ue11)->self.controller, "USB: OUT EP %x Complete",
 						 ep->epnum);
 					urbstat = 0;
 				}
@@ -892,12 +892,12 @@ static void process_transfer_result(struct ue11 *ue11, struct ue11h_ep *ep)
 			prefetchw(buf);
 
 			len = ((status >> USB_RX_STAT_COUNT_BITS_SHIFT) &
-			       USB_RX_STAT_COUNT_BITS_MASK);
-            pr_debug("USB: Received length %d, requested %d",
+				   USB_RX_STAT_COUNT_BITS_MASK);
+			pr_debug("USB: Received length %d, requested %d",
 				 urb->actual_length + len, ep->length);
 
 			if ((urb->actual_length + len) >
-			    urb->transfer_buffer_length) {
+				urb->transfer_buffer_length) {
 				urbstat = -EOVERFLOW;
 				BUG_ON(1);
 			} else
@@ -909,9 +909,9 @@ static void process_transfer_result(struct ue11 *ue11, struct ue11h_ep *ep)
 
 			usb_dotoggle(udev, ep->epnum, 0);
 			if (urbstat == -EINPROGRESS &&
-			    (len < ep->maxpacket ||
-			     urb->actual_length ==
-				     urb->transfer_buffer_length)) {
+				(len < ep->maxpacket ||
+				 urb->actual_length ==
+					 urb->transfer_buffer_length)) {
 				if (usb_pipecontrol(urb->pipe))
 					ep->nextpid = USB_PID_ACK;
 				else {
@@ -948,7 +948,7 @@ static void process_transfer_result(struct ue11 *ue11, struct ue11h_ep *ep)
 	/* error? retry, until "3 strikes" */
 	else if (++ep->error_count >= 3) {
 		pr_err("USB: Timeout %d (sts=%x)!",
-				     ep->error_count, status);
+					 ep->error_count, status);
 		if (status & (1 << USB_RX_STAT_RESP_TIMEOUT_SHIFT))
 			urbstat = -ETIME;
 		//else if (status & SL11H_STATMASK_OVF)
@@ -958,7 +958,7 @@ static void process_transfer_result(struct ue11 *ue11, struct ue11h_ep *ep)
 		ep->error_count = 0;
 	} else {
 		pr_err("USB: Timeout %d (sts=%x)!\n",
-				     ep->error_count, status);
+					 ep->error_count, status);
 	}
 
 	if (urbstat != -EINPROGRESS || urb->unlinked)
@@ -986,7 +986,7 @@ retry:
 
 	// IRQ: Packet transfer complete or error detected
 	if (irqstat &
-	    ((1 << USB_IRQ_STS_DONE_SHIFT) | (1 << USB_IRQ_STS_ERR_SHIFT))) {
+		((1 << USB_IRQ_STS_DONE_SHIFT) | (1 << USB_IRQ_STS_ERR_SHIFT))) {
 		process_transfer_result(ue11, ue11->active_transfer);
 		ue11->active_transfer = NULL;
 		ue11->stat_a++;
@@ -1000,9 +1000,9 @@ retry:
 		ue11->stat_sof++;
 
 		/* be graceful about almost-inevitable periodic schedule
-         * overruns:  continue the previous frame's transfers iff
-         * this one has nothing scheduled.
-         */
+		 * overruns:  continue the previous frame's transfers iff
+		 * this one has nothing scheduled.
+		 */
 		if (ue11->next_periodic)
 			ue11->stat_overrun++;
 
@@ -1041,8 +1041,8 @@ static int balance(struct ue11 *ue11, u16 period, u16 load)
 	int i, branch = -ENOSPC;
 
 	/* search for the least loaded schedule branch of that period
-     * which has enough bandwidth left unreserved.
-     */
+	 * which has enough bandwidth left unreserved.
+	 */
 	for (i = 0; i < period; i++) {
 		if (branch < 0 || ue11->load[branch] > ue11->load[i]) {
 			int j;
@@ -1062,7 +1062,7 @@ static int balance(struct ue11 *ue11, u16 period, u16 load)
 // ue11h_urb_enqueue
 //-----------------------------------------------------------------
 static int ue11h_urb_enqueue(struct usb_hcd *hcd, struct urb *urb,
-			     gfp_t mem_flags)
+				 gfp_t mem_flags)
 {
 	struct ue11 *ue11 = hcd_to_ue11(hcd);
 	struct usb_device *udev = urb->dev;
@@ -1080,7 +1080,7 @@ static int ue11h_urb_enqueue(struct usb_hcd *hcd, struct urb *urb,
 
 	// NOTE: ISO transfer not supported
 	if (type == PIPE_ISOCHRONOUS) {
-        dev_err(hcd->self.controller, "USB: Isochronous transfers not supported");
+		dev_err(hcd->self.controller, "USB: Isochronous transfers not supported");
 		return -ENOSPC;
 	}
 
@@ -1101,7 +1101,7 @@ static int ue11h_urb_enqueue(struct usb_hcd *hcd, struct urb *urb,
 
 	/* don't submit to a dead or disabled port */
 	if (!(ue11->port1 & USB_PORT_STAT_ENABLE) ||
-	    !HC_IS_RUNNING(hcd->state)) {
+		!HC_IS_RUNNING(hcd->state)) {
 		retval = -ENODEV;
 		kfree(ep);
 		goto fail_not_linked;
@@ -1146,8 +1146,8 @@ static int ue11h_urb_enqueue(struct usb_hcd *hcd, struct urb *urb,
 			if (type == PIPE_ISOCHRONOUS)
 				; // TODO: ISO
 			ep->load = usb_calc_bus_time(udev->speed, !is_out,
-						     (type == PIPE_ISOCHRONOUS),
-						     usb_maxpacket(udev, pipe,
+							 (type == PIPE_ISOCHRONOUS),
+							 usb_maxpacket(udev, pipe,
 								   is_out)) /
 				   1000;
 			break;
@@ -1169,10 +1169,10 @@ static int ue11h_urb_enqueue(struct usb_hcd *hcd, struct urb *urb,
 		urb->interval = ep->period;
 		if (ep->branch < PERIODIC_SIZE) {
 			/* NOTE:  the phase is correct here, but the value
-             * needs offsetting by the transfer queue depth.
-             * All current drivers ignore start_frame, so this
-             * is unlikely to ever matter...
-             */
+			 * needs offsetting by the transfer queue depth.
+			 * All current drivers ignore start_frame, so this
+			 * is unlikely to ever matter...
+			 */
 			urb->start_frame = (ue11->frame & (PERIODIC_SIZE - 1)) +
 					   ep->branch;
 			break;
@@ -1187,9 +1187,9 @@ static int ue11h_urb_enqueue(struct usb_hcd *hcd, struct urb *urb,
 			(ue11->frame & (PERIODIC_SIZE - 1)) + ep->branch;
 
 		/* sort each schedule branch by period (slow before fast)
-         * to share the faster parts of the tree without needing
-         * dummy/placeholder nodes
-         */
+		 * to share the faster parts of the tree without needing
+		 * dummy/placeholder nodes
+		 */
 		dev_dbg(hcd->self.controller, "schedule qh%d/%p branch %d\n",
 			ep->period, ep, ep->branch);
 		for (i = ep->branch; i < PERIODIC_SIZE; i += ep->period) {
@@ -1245,8 +1245,8 @@ static int ue11h_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
 	ep = hep->hcpriv;
 	if (ep) {
 		/* finish right away if this urb can't be active ...
-         * note that some drivers wrongly expect delays
-         */
+		 * note that some drivers wrongly expect delays
+		 */
 		if (ep->hep->urb_list.next != &urb->urb_list) {
 			/* not front of queue?  never active */
 		}
@@ -1254,7 +1254,7 @@ static int ue11h_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
 		else if (ue11->active_transfer == ep) {
 			if (time_before_eq(ue11->active_start, jiffies)) {
 				/* happens a lot with lowspeed?? */
-                dev_err(hcd->self.controller, "USB: Giving up on transfer....\n");
+				dev_err(hcd->self.controller, "USB: Giving up on transfer....\n");
 				ue11->active_transfer = NULL;
 			} else
 				urb = NULL;
@@ -1302,9 +1302,9 @@ static int ue11h_get_frame(struct usb_hcd *hcd)
 	struct ue11 *ue11 = hcd_to_ue11(hcd);
 
 	/* wrong except while periodic transfers are scheduled;
-     * never matches the on-the-wire frame;
-     * subject to overruns.
-     */
+	 * never matches the on-the-wire frame;
+	 * subject to overruns.
+	 */
 	return ue11->frame;
 }
 //-----------------------------------------------------------------
@@ -1371,7 +1371,7 @@ static void ue11h_timer(struct timer_list *t)
 
 	// Enable USB interrupts
 	ue11->irq_enable |= ((1 << USB_IRQ_MASK_ERR_SHIFT) |
-			     (1 << USB_IRQ_MASK_DONE_SHIFT));
+				 (1 << USB_IRQ_MASK_DONE_SHIFT));
 
 	/* reenable irqs */
 	writel(ue11->irq_enable, ue11->reg_base + USB_IRQ_MASK);
@@ -1381,13 +1381,13 @@ static void ue11h_timer(struct timer_list *t)
 // ue11h_hub_control
 //-----------------------------------------------------------------
 static int ue11h_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
-			     u16 wIndex, char *buf, u16 wLength)
+				 u16 wIndex, char *buf, u16 wLength)
 {
 	struct ue11 *ue11;
 	int retval;
 	unsigned long flags;
 
-    dev_info(hcd->self.controller, "USB: ue11h_hub_control typeReq %x wValue %x wIndex %x",
+	dev_info(hcd->self.controller, "USB: ue11h_hub_control typeReq %x wValue %x wIndex %x",
 		 typeReq, wValue, wIndex);
 	ue11 = hcd_to_ue11(hcd);
 	retval = 0;
@@ -1397,7 +1397,7 @@ static int ue11h_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 	switch (typeReq) {
 	case ClearHubFeature:
 	case SetHubFeature:
-        dev_info(hcd->self.controller, "USB: Set/Clear hub feature 0x%x", wValue);
+		dev_info(hcd->self.controller, "USB: Set/Clear hub feature 0x%x", wValue);
 		switch (wValue) {
 		case C_HUB_OVER_CURRENT:
 		case C_HUB_LOCAL_POWER:
@@ -1407,7 +1407,7 @@ static int ue11h_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 		}
 		break;
 	case ClearPortFeature:
-        dev_info(hcd->self.controller, "USB: Clear Port feature 0x%x", wValue);
+		dev_info(hcd->self.controller, "USB: Clear Port feature 0x%x", wValue);
 		if (wIndex != 1 || wLength != 0)
 			goto error;
 
@@ -1424,7 +1424,7 @@ static int ue11h_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 			dev_info(hcd->self.controller, "ue11h_hub_control: USB_PORT_FEAT_SUSPEND (RESUME)");
 			break;
 		case USB_PORT_FEAT_POWER:
-            dev_info(hcd->self.controller, "USB: Clear - USB_PORT_FEAT_POWER");
+			dev_info(hcd->self.controller, "USB: Clear - USB_PORT_FEAT_POWER");
 			break;
 		case USB_PORT_FEAT_C_ENABLE:
 		case USB_PORT_FEAT_C_SUSPEND:
@@ -1449,7 +1449,7 @@ static int ue11h_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 		break;
 	case GetPortStatus:
 		dev_info(hcd->self.controller, "USB: Get port status 0x%x (Port=%x)\n",
-				      wValue, ue11->port1);
+					  wValue, ue11->port1);
 		if (wIndex != 1)
 			goto error;
 		put_unaligned_le32(ue11->port1, buf);
@@ -1564,8 +1564,8 @@ static const struct hc_driver ue11h_hc_driver = {
 	.hcd_priv_size = sizeof(struct ue11),
 
 	/*
-     * generic hardware linkage
-     */
+	 * generic hardware linkage
+	 */
 	.irq = ue11h_irq,
 	.flags = HCD_USB11, //| HCD_MEMORY,
 
@@ -1574,20 +1574,20 @@ static const struct hc_driver ue11h_hc_driver = {
 	.stop = ue11h_stop,
 
 	/*
-     * managing i/o requests and associated device resources
-     */
+	 * managing i/o requests and associated device resources
+	 */
 	.urb_enqueue = ue11h_urb_enqueue,
 	.urb_dequeue = ue11h_urb_dequeue,
 	.endpoint_disable = ue11h_endpoint_disable,
 
 	/*
-     * periodic schedule support
-     */
+	 * periodic schedule support
+	 */
 	.get_frame_number = ue11h_get_frame,
 
 	/*
-     * root hub support
-     */
+	 * root hub support
+	 */
 	.hub_status_data = ue11h_hub_status_data,
 	.hub_control = ue11h_hub_control,
 	.bus_suspend = ue11h_bus_suspend,
@@ -1621,20 +1621,20 @@ static int ue11h_probe(struct platform_device *dev)
 	if (usb_disabled()) {
 		retval = -ENODEV;
 		goto err5;
-    }
+	}
 
 	iores = platform_get_resource(dev, IORESOURCE_MEM, 0);
 	if (!iores) {
 		retval = -ENODEV;
 		goto err5;
-    }
+	}
 
 	// Get IRQ for device
 	irq = platform_get_irq(dev, 0);
 	if (irq < 0) {
 		retval = -ENODEV;
 		goto err5;
-    }
+	}
 
 	// Get device memory
 	dev_base = devm_ioremap_resource(&dev->dev, iores);
@@ -1664,14 +1664,14 @@ static int ue11h_probe(struct platform_device *dev)
 	msleep(200);
 
 	/* The chip's IRQ is level triggered, active high.  A requirement
-     * for platform device setup is to cope with things like signal
-     * inverters (e.g. CF is active low) or working only with edge
-     * triggers (e.g. most ARM CPUs).  Initial driver stress testing
-     * was on a system with single edge triggering, so most sorts of
-     * triggering arrangement should work.
-     *
-     * Use resource IRQ flags if set by platform device setup.
-     */
+	 * for platform device setup is to cope with things like signal
+	 * inverters (e.g. CF is active low) or working only with edge
+	 * triggers (e.g. most ARM CPUs).  Initial driver stress testing
+	 * was on a system with single edge triggering, so most sorts of
+	 * triggering arrangement should work.
+	 *
+	 * Use resource IRQ flags if set by platform device setup.
+	 */
 	retval = usb_add_hcd(hcd, irq, IRQF_SHARED);
 	if (retval != 0) {
 		goto err6;
@@ -1725,8 +1725,8 @@ static int ue11h_resume(struct platform_device *dev)
 	struct ue11 *ue11 = hcd_to_ue11(hcd);
 
 	/* with no "check to see if VBUS is still powered" board hook,
-     * let's assume it'd only be powered to enable remote wakeup.
-     */
+	 * let's assume it'd only be powered to enable remote wakeup.
+	 */
 	if (!ue11->port1 || !device_can_wakeup(&hcd->self.root_hub->dev)) {
 		ue11->port1 = 0;
 		port_power(ue11, 1);
