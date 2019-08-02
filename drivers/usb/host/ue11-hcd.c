@@ -8,8 +8,6 @@
  * Copyright (C) 2004-2005 David Brownell
  * Copyright (C) 1999 Roman Weissgaerber
  */
-#define DEBUG
-
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/kernel.h>
@@ -33,24 +31,6 @@
 #include <asm/irq.h>
 #include <asm/byteorder.h>
 #include <asm/unaligned.h>
-
-//-----------------------------------------------------------------
-// Logging levels:
-//-----------------------------------------------------------------
-#define USBLOG_NONE 0
-#define USBLOG_ERR 1
-#define USBLOG_REQ 2
-#define USBLOG_INFO 3
-#define USBLOG_DATA 4
-
-// Current USB_LOG level
-#define USBLOG_LEVEL USBLOG_REQ
-
-#define USB_LOG(l, a)                                                          \
-	do {                                                                   \
-		if (l <= USBLOG_LEVEL)                                         \
-			printk a;                                              \
-	} while (0)
 
 //-----------------------------------------------------------------
 // Defines:
@@ -271,15 +251,11 @@ struct ue11h_ep {
 };
 //-----------------------------------------------------------------
 
-MODULE_DESCRIPTION("UE11 USB Host Controller Driver");
-MODULE_LICENSE("GPL");
-MODULE_ALIAS("platform:ue11-hcd");
 
 #define DRIVER_VERSION "20 Apr 2019"
 
 static const char hcd_name[] = "ue11-hcd";
 
-#if USBLOG_LEVEL >= USBLOG_REQ
 //-----------------------------------------------------------------
 // dbg_get_ctrl_req_str:
 //-----------------------------------------------------------------
@@ -346,15 +322,15 @@ static void dbg_decode_setup_packet(uint8_t *p)
 {
 	struct usb_ctrlrequest *ctrl = (struct usb_ctrlrequest *)p;
 
-	printk("Debug: SETUP PACKET\n");
-	printk("       bRequestType 0x%x (%s)\n", ctrl->bRequestType,
+	pr_debug("Debug: SETUP PACKET\n");
+	pr_debug("       bRequestType 0x%x (%s)\n", ctrl->bRequestType,
 	       dbg_get_ctrl_req_type_str(ctrl->bRequestType));
-	printk("       bRequest 0x%x (%s)\n", ctrl->bRequest,
+	pr_debug("       bRequest 0x%x (%s)\n", ctrl->bRequest,
 	       dbg_get_ctrl_req_str(ctrl->bRequest));
-	printk("       wValue 0x%x, wIndex 0x%x, wLength %d\n", ctrl->wValue,
+	pr_debug("       wValue 0x%x, wIndex 0x%x, wLength %d\n", ctrl->wValue,
 	       ctrl->wIndex, ctrl->wLength);
 }
-#endif
+
 //-----------------------------------------------------------------
 // usbhw_hub_reset: Put bus into SE0 state (reset)
 //-----------------------------------------------------------------
@@ -362,7 +338,7 @@ static void usbhw_hub_reset(struct ue11 *ue11)
 {
 	uint32_t val;
 
-	USB_LOG(USBLOG_INFO, ("HW: Enter USB bus reset\n"));
+	pr_info("HW: Enter USB bus reset\n");
 
 	// Power-up / SE0
 	val = 0;
@@ -382,7 +358,7 @@ static void usbhw_hub_enable(struct ue11 *ue11, int full_speed, int enable_sof)
 {
 	uint32_t val;
 
-	USB_LOG(USBLOG_INFO, ("HW: Enable root hub\n"));
+	pr_info("HW: Enable root hub\n");
 
 	// Host Full Speed
 	val = 0;
@@ -446,22 +422,18 @@ static void setup_packet(struct ue11 *ue11, struct ue11h_ep *ep,
 
 	int len = sizeof(struct usb_ctrlrequest);
 
-	USB_LOG(USBLOG_DATA, ("USB: Send SETUP_PACKET\n"));
+	pr_debug("USB: Send SETUP_PACKET");
 
-	USB_LOG(USBLOG_DATA, ("TOKEN: SETUP"));
-	USB_LOG(USBLOG_DATA, ("  DEV %d EP %d\n", device_addr, endpoint));
+	pr_debug("TOKEN: SETUP");
+	pr_debug("  DEV %d EP %d", device_addr, endpoint);
 
 	// Load DATA0 transfer into address 0+
-	USB_LOG(USBLOG_DATA, (" Tx: %02x\n", USB_PID_DATA0));
+	pr_debug(" Tx: %02x", USB_PID_DATA0);
 	for (l = 0; l < len; l++) {
-		USB_LOG(USBLOG_DATA, (" %02x", urb->setup_packet[l]));
 		writel(urb->setup_packet[l], ue11->reg_base + USB_WR_DATA);
 	}
-	USB_LOG(USBLOG_DATA, ("\n"));
 
-#if USBLOG_LEVEL >= USBLOG_REQ
 	dbg_decode_setup_packet(urb->setup_packet);
-#endif
 
 	// Transfer data length
 	writel(len, ue11->reg_base + USB_XFER_DATA);
@@ -498,11 +470,10 @@ static void status_packet(struct ue11 *ue11, struct ue11h_ep *ep,
 		uint32_t device_addr = usb_pipedevice(urb->pipe);
 		uint32_t endpoint = usb_pipeendpoint(urb->pipe);
 
-		USB_LOG(USBLOG_DATA, ("USB: Send STATUS (OUT)\n"));
+		pr_debug("USB: Send STATUS (OUT)\n");
 
-		USB_LOG(USBLOG_DATA, ("TOKEN: OUT (STATUS)"));
-		USB_LOG(USBLOG_DATA,
-			("  DEV %d EP %d\n", device_addr, endpoint));
+		pr_debug("TOKEN: OUT (STATUS)");
+        pr_debug("  DEV %d EP %d\n", device_addr, endpoint);
 
 		// Transfer data length (zero length packet - just PID)
 		writel(0, ue11->reg_base + USB_XFER_DATA);
@@ -529,11 +500,10 @@ static void status_packet(struct ue11 *ue11, struct ue11h_ep *ep,
 		uint32_t device_addr = usb_pipedevice(urb->pipe);
 		uint32_t endpoint = usb_pipeendpoint(urb->pipe);
 
-		USB_LOG(USBLOG_DATA, ("USB: Send STATUS (IN)\n"));
+		pr_debug("USB: Send STATUS (IN)\n");
 
-		USB_LOG(USBLOG_DATA, ("TOKEN: IN (STATUS)"));
-		USB_LOG(USBLOG_DATA,
-			("  DEV %d EP %d\n", device_addr, endpoint));
+		pr_debug("TOKEN: IN (STATUS)");
+		pr_debug("  DEV %d EP %d\n", device_addr, endpoint);
 
 		// No data to send
 		writel(0, ue11->reg_base + USB_XFER_DATA);
@@ -565,11 +535,11 @@ static void in_packet(struct ue11 *ue11, struct ue11h_ep *ep, struct urb *urb)
 	uint32_t device_addr = usb_pipedevice(urb->pipe);
 	uint32_t endpoint = usb_pipeendpoint(urb->pipe);
 
-	USB_LOG(USBLOG_REQ, ("USB: IN Request EP %x (%d/%d)\n", endpoint,
-			     urb->actual_length, urb->transfer_buffer_length));
+	pr_debug("USB: IN Request EP %x (%d/%d)\n", endpoint,
+			     urb->actual_length, urb->transfer_buffer_length);
 
-	USB_LOG(USBLOG_DATA, ("TOKEN: IN"));
-	USB_LOG(USBLOG_DATA, ("  DEV %d EP %d\n", device_addr, endpoint));
+	pr_debug("TOKEN: IN");
+	pr_debug("  DEV %d EP %d\n", device_addr, endpoint);
 
 	// No data to send
 	writel(0, ue11->reg_base + USB_XFER_DATA);
@@ -605,7 +575,7 @@ static void out_packet(struct ue11 *ue11, struct ue11h_ep *ep, struct urb *urb)
 	uint8_t *buf;
 	int len;
 
-	USB_LOG(USBLOG_DATA, ("USB: Send OUT_PACKET\n"));
+	pr_debug("USB: Send OUT_PACKET\n");
 
 	buf = (uint8_t *)urb->transfer_buffer + urb->actual_length;
 	prefetch(buf);
@@ -614,24 +584,21 @@ static void out_packet(struct ue11 *ue11, struct ue11h_ep *ep, struct urb *urb)
 	len = min_t(u32, ep->maxpacket,
 		    urb->transfer_buffer_length - urb->actual_length);
 
-	USB_LOG(USBLOG_DATA, ("TOKEN: OUT"));
-	USB_LOG(USBLOG_DATA, ("  DEV %d EP %d\n", device_addr, endpoint));
+	pr_debug("TOKEN: OUT");
+	pr_debug("  DEV %d EP %d\n", device_addr, endpoint);
 
 	request = usb_gettoggle(urb->dev, usb_pipeendpoint(urb->pipe),
 				usb_pipeout(urb->pipe)) ?
 			  USB_PID_DATA1 :
 			  USB_PID_DATA0;
 
-	USB_LOG(USBLOG_REQ,
-		("USB: OUT EP %x, LEN %d, PID=%x\n", endpoint, len, request));
+	pr_info("USB: OUT EP %x, LEN %d, PID=%x\n", endpoint, len, request);
 
 	// Load DATAx transfer into address 0+
-	USB_LOG(USBLOG_DATA, (" Tx:\n %02x", request));
+	pr_debug(" Tx: %02x", request);
 	for (l = 0; l < len; l++) {
-		USB_LOG(USBLOG_DATA, (" %02x", buf[l]));
 		writel(buf[l], ue11->reg_base + USB_WR_DATA);
 	}
-	USB_LOG(USBLOG_DATA, ("\n"));
 
 	// Transfer data length
 	writel(len, ue11->reg_base + USB_XFER_DATA);
@@ -661,7 +628,7 @@ static inline void enable_sof_interrupt(struct ue11 *ue11)
 {
 	if (ue11->irq_enable & (1 << USB_IRQ_MASK_SOF_SHIFT))
 		return;
-	USB_LOG(USBLOG_INFO, ("USB: Enable SOF\n"));
+	pr_info("USB: Enable SOF");
 	ue11->irq_enable |= (1 << USB_IRQ_MASK_SOF_SHIFT);
 }
 //-----------------------------------------------------------------
@@ -671,7 +638,7 @@ static inline void disable_sof_interrupt(struct ue11 *ue11)
 {
 	if (!(ue11->irq_enable & (1 << USB_IRQ_MASK_SOF_SHIFT)))
 		return;
-	USB_LOG(USBLOG_INFO, ("USB: Disable SOF\n"));
+	pr_info("USB: Disable SOF");
 	ue11->irq_enable &= ~(1 << USB_IRQ_MASK_SOF_SHIFT);
 }
 //-----------------------------------------------------------------
@@ -759,7 +726,7 @@ static void finish_request(struct ue11 *ue11, struct ue11h_ep *ep,
 {
 	unsigned i;
 
-	USB_LOG(USBLOG_INFO, ("USB: URB finish %p\n", urb));
+	pr_info("USB: URB finish %p\n", urb);
 
 	if (usb_pipecontrol(urb->pipe))
 		ep->nextpid = USB_PID_SETUP;
@@ -822,27 +789,37 @@ static void process_transfer_result(struct ue11 *ue11, struct ue11h_ep *ep)
 	response = ((status >> USB_RX_STAT_RESP_BITS_SHIFT) &
 		    USB_RX_STAT_RESP_BITS_MASK);
 
-	USB_LOG(USBLOG_DATA, ("  STAT: %08x\n", status));
-	USB_LOG(USBLOG_DATA, ("  RESP: %08x\n", response));
+	pr_debug("  STAT: %08x\n", status);
+	pr_debug("  RESP: %08x\n", response);
 
 	// Request still pending
-	BUG_ON(status & (1 << USB_RX_STAT_START_PEND_SHIFT));
+	if (status & (1 << USB_RX_STAT_START_PEND_SHIFT)) {
+		pr_err("USB: request still pending");
+		return;
+	}
 
 	// CRC error
 	if (status & (1 << USB_RX_STAT_CRC_ERR_SHIFT)) {
 		// Response PID field will be zero!
-		USB_LOG(USBLOG_ERR, ("USB: CRC error detected (last pid=%x)\n",
-				     ep->nextpid));
-		BUG_ON(1);
+		pr_err("USB: CRC error detected (last pid=%x)",
+				     ep->nextpid);
+		return;
+	}
+
+	// CRC error
+	if (status & (1 << USB_RX_STAT_CRC_ERR_SHIFT)) {
+		// Response PID field will be zero!
+		pr_err("USB: CRC error detected (last pid=%x)",
+				     ep->nextpid);
+		return;
 	}
 
 	// Timeout error
 	if (status & (1 << USB_RX_STAT_RESP_TIMEOUT_SHIFT)) {
 		// Response PID field will be zero!
-		USB_LOG(USBLOG_ERR,
-			("USB: Timeout error detected (last pid=%x)\n",
-			 ep->nextpid));
-		BUG_ON(1);
+        pr_err("USB: Timeout error detected (last pid=%x)",
+			 ep->nextpid);
+		return;
 	}
 
 	urb = container_of(ep->hep->urb_list.next, struct urb, urb_list);
@@ -858,7 +835,7 @@ static void process_transfer_result(struct ue11 *ue11, struct ue11h_ep *ep)
 
 	/* we can safely ignore NAKs */
 	if (response == USB_PID_NAK) {
-		USB_LOG(USBLOG_DATA, ("USB: NAK %d\n", ep->nak_count));
+		pr_debug("USB: NAK %d\n", ep->nak_count);
 		if (!ep->period)
 			ep->nak_count++;
 		ep->error_count = 0;
@@ -874,7 +851,7 @@ static void process_transfer_result(struct ue11 *ue11, struct ue11h_ep *ep)
 		ep->nak_count = ep->error_count = 0;
 		switch (ep->nextpid) {
 		case USB_PID_OUT:
-			USB_LOG(USBLOG_DATA, ("USB: PID_OUT ACK\n"));
+			pr_debug("USB: PID_OUT ACK");
 			urb->actual_length += ep->length;
 			usb_dotoggle(udev, ep->epnum, 1);
 			if (urb->actual_length == urb->transfer_buffer_length) {
@@ -887,23 +864,21 @@ static void process_transfer_result(struct ue11 *ue11, struct ue11h_ep *ep)
 				else if (ep->length < ep->maxpacket ||
 					 !(urb->transfer_flags &
 					   URB_ZERO_PACKET)) {
-					USB_LOG(USBLOG_REQ,
-						("USB: OUT EP %x Complete\n",
-						 ep->epnum));
+                    pr_info("USB: OUT EP %x Complete",
+						 ep->epnum);
 					urbstat = 0;
 				}
 			}
 			break;
 		case USB_PID_IN:
-			USB_LOG(USBLOG_DATA, ("USB: PID_IN ACK\n"));
+			pr_debug("USB: PID_IN ACK\n");
 			buf = urb->transfer_buffer + urb->actual_length;
 			prefetchw(buf);
 
 			len = ((status >> USB_RX_STAT_COUNT_BITS_SHIFT) &
 			       USB_RX_STAT_COUNT_BITS_MASK);
-			USB_LOG(USBLOG_DATA,
-				("USB: Received length %d, requested %d\n",
-				 urb->actual_length + len, ep->length));
+            pr_debug("USB: Received length %d, requested %d",
+				 urb->actual_length + len, ep->length);
 
 			if ((urb->actual_length + len) >
 			    urb->transfer_buffer_length) {
@@ -914,9 +889,7 @@ static void process_transfer_result(struct ue11 *ue11, struct ue11h_ep *ep)
 
 			for (l = 0; l < len; l++) {
 				buf[l] = readl(ue11->reg_base + USB_RD_DATA);
-				USB_LOG(USBLOG_DATA, (" %02x", buf[l]));
 			}
-			USB_LOG(USBLOG_DATA, ("\n"));
 
 			usb_dotoggle(udev, ep->epnum, 0);
 			if (urbstat == -EINPROGRESS &&
@@ -926,15 +899,14 @@ static void process_transfer_result(struct ue11 *ue11, struct ue11h_ep *ep)
 				if (usb_pipecontrol(urb->pipe))
 					ep->nextpid = USB_PID_ACK;
 				else {
-					USB_LOG(USBLOG_REQ,
-						("USB: IN EP %x Complete\n",
-						 ep->epnum));
+					pr_info("USB: IN EP %x Complete",
+						 ep->epnum);
 					urbstat = 0;
 				}
 			}
 			break;
 		case USB_PID_SETUP:
-			USB_LOG(USBLOG_DATA, ("USB: PID_SETUP ACK\n"));
+			pr_debug("USB: PID_SETUP ACK");
 			if (urb->transfer_buffer_length == urb->actual_length)
 				ep->nextpid = USB_PID_ACK;
 			else if (usb_pipeout(urb->pipe)) {
@@ -946,21 +918,21 @@ static void process_transfer_result(struct ue11 *ue11, struct ue11h_ep *ep)
 			}
 			break;
 		case USB_PID_ACK:
-			USB_LOG(USBLOG_REQ, ("USB: SETUP PACKET Complete\n"));
+			pr_debug("USB: SETUP PACKET Complete");
 			urbstat = 0;
 			break;
 		}
 	}
 	/* STALL stops all transfers */
 	else if (response == USB_PID_STALL) {
-		USB_LOG(USBLOG_ERR, ("USB: STALL (sts=%x)!\n", status));
+		pr_debug("USB: STALL (sts=%x)!", status);
 		ep->nak_count = ep->error_count = 0;
 		urbstat = -EPIPE;
 	}
 	/* error? retry, until "3 strikes" */
 	else if (++ep->error_count >= 3) {
-		USB_LOG(USBLOG_ERR, ("USB: Timeout %d (sts=%x)!\n",
-				     ep->error_count, status));
+		pr_err("USB: Timeout %d (sts=%x)!",
+				     ep->error_count, status);
 		if (status & (1 << USB_RX_STAT_RESP_TIMEOUT_SHIFT))
 			urbstat = -ETIME;
 		//else if (status & SL11H_STATMASK_OVF)
@@ -969,8 +941,8 @@ static void process_transfer_result(struct ue11 *ue11, struct ue11h_ep *ep)
 			urbstat = -EPROTO;
 		ep->error_count = 0;
 	} else {
-		USB_LOG(USBLOG_ERR, ("USB: Timeout %d (sts=%x)!\n",
-				     ep->error_count, status));
+		pr_err("USB: Timeout %d (sts=%x)!\n",
+				     ep->error_count, status);
 	}
 
 	if (urbstat != -EINPROGRESS || urb->unlinked)
@@ -1088,18 +1060,17 @@ static int ue11h_urb_enqueue(struct usb_hcd *hcd, struct urb *urb,
 	int retval;
 	struct usb_host_endpoint *hep = urb->ep;
 
-	USB_LOG(USBLOG_INFO, ("USB: URB queue %p\n", urb));
+	pr_info("USB: URB queue %p\n", urb);
 
 	// NOTE: ISO transfer not supported
 	if (type == PIPE_ISOCHRONOUS) {
-		USB_LOG(USBLOG_ERR,
-			("USB: Isochronous transfers not supported\n"));
+        pr_err("USB: Isochronous transfers not supported");
 		return -ENOSPC;
 	}
 
 	// NOTE: Low speed devices are not supported!
 	if (udev->speed == USB_SPEED_LOW) {
-		USB_LOG(USBLOG_ERR, ("USB: Low speed devices not supported\n"));
+		pr_err("USB: Low speed devices not supported");
 		return -ENOSPC;
 	}
 
@@ -1267,8 +1238,7 @@ static int ue11h_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
 		else if (ue11->active_transfer == ep) {
 			if (time_before_eq(ue11->active_start, jiffies)) {
 				/* happens a lot with lowspeed?? */
-				USB_LOG(USBLOG_ERR,
-					("USB: Giving up on transfer....\n"));
+                pr_err("USB: Giving up on transfer....\n");
 				ue11->active_transfer = NULL;
 			} else
 				urb = NULL;
@@ -1401,9 +1371,8 @@ static int ue11h_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 	int retval;
 	unsigned long flags;
 
-	USB_LOG(USBLOG_INFO,
-		("USB: ue11h_hub_control typeReq %x wValue %x wIndex %x\n",
-		 typeReq, wValue, wIndex));
+    pr_info("USB: ue11h_hub_control typeReq %x wValue %x wIndex %x",
+		 typeReq, wValue, wIndex);
 	ue11 = hcd_to_ue11(hcd);
 	retval = 0;
 
@@ -1412,8 +1381,7 @@ static int ue11h_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 	switch (typeReq) {
 	case ClearHubFeature:
 	case SetHubFeature:
-		USB_LOG(USBLOG_INFO,
-			("USB: Set/Clear hub feature 0x%x\n", wValue));
+        pr_info("USB: Set/Clear hub feature 0x%x", wValue);
 		switch (wValue) {
 		case C_HUB_OVER_CURRENT:
 		case C_HUB_LOCAL_POWER:
@@ -1423,14 +1391,13 @@ static int ue11h_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 		}
 		break;
 	case ClearPortFeature:
-		USB_LOG(USBLOG_INFO,
-			("USB: Clear Port feature 0x%x\n", wValue));
+        pr_info("USB: Clear Port feature 0x%x", wValue);
 		if (wIndex != 1 || wLength != 0)
 			goto error;
 
 		switch (wValue) {
 		case USB_PORT_FEAT_ENABLE:
-			pr_info("ue11h_hub_control: USB_PORT_FEAT_ENABLE (DISABLE)\n");
+			pr_info("ue11h_hub_control: USB_PORT_FEAT_ENABLE (DISABLE)");
 			ue11->port1 &= USB_PORT_STAT_POWER;
 			ue11->irq_enable = 0;
 			writel(ue11->irq_enable, ue11->reg_base + USB_IRQ_MASK);
@@ -1438,36 +1405,35 @@ static int ue11h_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 		case USB_PORT_FEAT_SUSPEND:
 			if (!(ue11->port1 & USB_PORT_STAT_SUSPEND))
 				break;
-			pr_info("ue11h_hub_control: USB_PORT_FEAT_SUSPEND (RESUME)\n");
+			pr_info("ue11h_hub_control: USB_PORT_FEAT_SUSPEND (RESUME)");
 			break;
 		case USB_PORT_FEAT_POWER:
-			USB_LOG(USBLOG_INFO,
-				("USB: Clear - USB_PORT_FEAT_POWER\n"));
+            pr_info("USB: Clear - USB_PORT_FEAT_POWER");
 			break;
 		case USB_PORT_FEAT_C_ENABLE:
 		case USB_PORT_FEAT_C_SUSPEND:
 		case USB_PORT_FEAT_C_CONNECTION:
 		case USB_PORT_FEAT_C_OVER_CURRENT:
 		case USB_PORT_FEAT_C_RESET:
-			USB_LOG(USBLOG_INFO, ("USB: Clear - Other\n"));
+			pr_info("USB: Clear - Other");
 			break;
 		default:
 			goto error;
 		}
 		ue11->port1 &= ~(1 << wValue);
-		USB_LOG(USBLOG_INFO, (" - (Port=%x)\n", ue11->port1));
+		pr_info(" - (Port=%x)\n", ue11->port1);
 		break;
 	case GetHubDescriptor:
-		USB_LOG(USBLOG_INFO, ("USB: Get hub descriptor\n"));
+		pr_info("USB: Get hub descriptor\n");
 		ue11h_hub_descriptor(ue11, (struct usb_hub_descriptor *)buf);
 		break;
 	case GetHubStatus:
-		USB_LOG(USBLOG_INFO, ("USB: Get hub status 0x%x\n", wValue));
+		pr_info("USB: Get hub status 0x%x\n", wValue);
 		put_unaligned_le32(0, buf);
 		break;
 	case GetPortStatus:
-		USB_LOG(USBLOG_INFO, ("USB: Get port status 0x%x (Port=%x)\n",
-				      wValue, ue11->port1));
+		pr_info("USB: Get port status 0x%x (Port=%x)\n",
+				      wValue, ue11->port1);
 		if (wIndex != 1)
 			goto error;
 		put_unaligned_le32(ue11->port1, buf);
@@ -1507,7 +1473,7 @@ static int ue11h_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 			goto error;
 		}
 		ue11->port1 |= 1 << wValue;
-		USB_LOG(USBLOG_INFO, (" - (Port=%x)\n", ue11->port1));
+		pr_info(" - (Port=%x)\n", ue11->port1);
 		break;
 
 	default:
@@ -1785,3 +1751,7 @@ struct platform_driver ue11h_driver = {
 EXPORT_SYMBOL(ue11h_driver);
 
 module_platform_driver(ue11h_driver);
+
+MODULE_DESCRIPTION("UE11 USB Host Controller Driver");
+MODULE_LICENSE("GPL");
+MODULE_ALIAS("platform:ue11-hcd");
