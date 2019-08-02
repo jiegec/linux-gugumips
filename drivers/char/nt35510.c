@@ -626,7 +626,7 @@ static int nt35510_of_probe(struct platform_device *pdev)
 	// Register the device driver
 
 	device_create(nt35510_class, NULL, MKDEV(majorNumber, 0), NULL,
-		      "nt355100");
+		      "nt35510");
 	nt35510s[0] = drvdata;
 	printk(KERN_INFO "nt35510: device created correctly, reg=%p\n",
 	       drvdata->regs); // Made it! device was initialized
@@ -678,7 +678,6 @@ static char *nt35510_devnode(struct device *dev, umode_t *mode)
 
 static int __init nt35510_module_init(void)
 {
-	int ret;
 	printk(KERN_INFO "nt35510: Initializing the nt35510\n");
 
 	// Try to dynamically allocate a major number for the device -- more difficult but worth it
@@ -686,7 +685,7 @@ static int __init nt35510_module_init(void)
 	if (majorNumber < 0) {
 		printk(KERN_ALERT
 		       "nt35510 failed to register a major number\n");
-		return ret;
+		return majorNumber;
 	}
 	nt35510_class = class_create(THIS_MODULE, "lcd");
 	nt35510_class->devnode = nt35510_devnode;

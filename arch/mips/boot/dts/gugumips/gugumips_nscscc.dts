@@ -145,6 +145,13 @@
             interrupt-parent = <&axi_intc_0>;
             interrupts = <3>;
         };
+
+        ue11: ue11@1e000000 {
+            compatible = "ue11-hcd";
+            reg = <0x1e000000 0x1000>;
+            interrupt-parent = <&axi_intc_0>;
+            interrupts = <4>;
+        };
     };
 };
 
