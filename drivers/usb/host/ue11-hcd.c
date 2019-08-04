@@ -617,10 +617,10 @@ static void out_packet(struct ue11 *ue11, struct ue11h_ep *ep, struct urb *urb)
 			  USB_PID_DATA1 :
 			  USB_PID_DATA0;
 
-	dev_info(ue11_to_hcd(ue11)->self.controller, "USB: OUT EP %x, LEN %d, PID=%x\n", endpoint, len, request);
+	dev_dbg(ue11_to_hcd(ue11)->self.controller, "USB: OUT EP %x, LEN %d, PID=%x\n", endpoint, len, request);
 
 	// Load DATAx transfer into address 0+
-	pr_debug(" Tx: %02x", request);
+	dev_dbg(ue11_to_hcd(ue11)->self.controller, " Tx: %02x", request);
 	for (l = 0; l < len; l++) {
 		writel(buf[l], ue11->reg_base + USB_WR_DATA);
 	}
@@ -880,7 +880,7 @@ static void process_transfer_result(struct ue11 *ue11, struct ue11h_ep *ep)
 				else if (ep->length < ep->maxpacket ||
 					 !(urb->transfer_flags &
 					   URB_ZERO_PACKET)) {
-					dev_info(ue11_to_hcd(ue11)->self.controller, "USB: OUT EP %x Complete",
+					dev_dbg(ue11_to_hcd(ue11)->self.controller, "USB: OUT EP %x Complete",
 						 ep->epnum);
 					urbstat = 0;
 				}
@@ -915,7 +915,7 @@ static void process_transfer_result(struct ue11 *ue11, struct ue11h_ep *ep)
 				if (usb_pipecontrol(urb->pipe))
 					ep->nextpid = USB_PID_ACK;
 				else {
-					dev_info(ue11_to_hcd(ue11)->self.controller, "USB: IN EP %x Complete",
+					dev_dbg(ue11_to_hcd(ue11)->self.controller, "USB: IN EP %x Complete",
 						 ep->epnum);
 					urbstat = 0;
 				}
@@ -1387,7 +1387,7 @@ static int ue11h_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 	int retval;
 	unsigned long flags;
 
-	dev_info(hcd->self.controller, "USB: ue11h_hub_control typeReq %x wValue %x wIndex %x",
+	dev_dbg(hcd->self.controller, "USB: ue11h_hub_control typeReq %x wValue %x wIndex %x",
 		 typeReq, wValue, wIndex);
 	ue11 = hcd_to_ue11(hcd);
 	retval = 0;
@@ -1397,7 +1397,7 @@ static int ue11h_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 	switch (typeReq) {
 	case ClearHubFeature:
 	case SetHubFeature:
-		dev_info(hcd->self.controller, "USB: Set/Clear hub feature 0x%x", wValue);
+		dev_dbg(hcd->self.controller, "USB: Set/Clear hub feature 0x%x", wValue);
 		switch (wValue) {
 		case C_HUB_OVER_CURRENT:
 		case C_HUB_LOCAL_POWER:
@@ -1407,13 +1407,13 @@ static int ue11h_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 		}
 		break;
 	case ClearPortFeature:
-		dev_info(hcd->self.controller, "USB: Clear Port feature 0x%x", wValue);
+		dev_dbg(hcd->self.controller, "USB: Clear Port feature 0x%x", wValue);
 		if (wIndex != 1 || wLength != 0)
 			goto error;
 
 		switch (wValue) {
 		case USB_PORT_FEAT_ENABLE:
-			dev_info(hcd->self.controller, "ue11h_hub_control: USB_PORT_FEAT_ENABLE (DISABLE)");
+			dev_dbg(hcd->self.controller, "ue11h_hub_control: USB_PORT_FEAT_ENABLE (DISABLE)");
 			ue11->port1 &= USB_PORT_STAT_POWER;
 			ue11->irq_enable = 0;
 			writel(ue11->irq_enable, ue11->reg_base + USB_IRQ_MASK);
@@ -1421,35 +1421,39 @@ static int ue11h_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 		case USB_PORT_FEAT_SUSPEND:
 			if (!(ue11->port1 & USB_PORT_STAT_SUSPEND))
 				break;
-			dev_info(hcd->self.controller, "ue11h_hub_control: USB_PORT_FEAT_SUSPEND (RESUME)");
+			dev_dbg(hcd->self.controller,
+				"ue11h_hub_control: USB_PORT_FEAT_SUSPEND (RESUME)");
 			break;
 		case USB_PORT_FEAT_POWER:
-			dev_info(hcd->self.controller, "USB: Clear - USB_PORT_FEAT_POWER");
+			dev_dbg(hcd->self.controller,
+				"USB: Clear - USB_PORT_FEAT_POWER");
 			break;
 		case USB_PORT_FEAT_C_ENABLE:
 		case USB_PORT_FEAT_C_SUSPEND:
 		case USB_PORT_FEAT_C_CONNECTION:
 		case USB_PORT_FEAT_C_OVER_CURRENT:
 		case USB_PORT_FEAT_C_RESET:
-			dev_info(hcd->self.controller, "USB: Clear - Other");
+			dev_dbg(hcd->self.controller, "USB: Clear - Other");
 			break;
 		default:
 			goto error;
 		}
 		ue11->port1 &= ~(1 << wValue);
-		dev_info(hcd->self.controller, " - (Port=%x)", ue11->port1);
+		dev_dbg(hcd->self.controller, " - (Port=%x)", ue11->port1);
 		break;
 	case GetHubDescriptor:
-		dev_info(hcd->self.controller, "USB: Get hub descriptor");
+		dev_dbg(hcd->self.controller, "USB: Get hub descriptor");
 		ue11h_hub_descriptor(ue11, (struct usb_hub_descriptor *)buf);
 		break;
 	case GetHubStatus:
-		dev_info(hcd->self.controller, "USB: Get hub status 0x%x", wValue);
+		dev_dbg(hcd->self.controller, "USB: Get hub status 0x%x",
+			wValue);
 		put_unaligned_le32(0, buf);
 		break;
 	case GetPortStatus:
-		dev_info(hcd->self.controller, "USB: Get port status 0x%x (Port=%x)\n",
-					  wValue, ue11->port1);
+		dev_dbg(hcd->self.controller,
+			"USB: Get port status 0x%x (Port=%x)\n", wValue,
+			ue11->port1);
 		if (wIndex != 1)
 			goto error;
 		put_unaligned_le32(ue11->port1, buf);
@@ -1463,10 +1467,12 @@ static int ue11h_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 				goto error;
 			if (!(ue11->port1 & USB_PORT_STAT_ENABLE))
 				goto error;
-			dev_info(hcd->self.controller, "ue11h_hub_control: USB_PORT_FEAT_SUSPEND (SUSPEND)\n");
+			dev_dbg(hcd->self.controller,
+				"ue11h_hub_control: USB_PORT_FEAT_SUSPEND (SUSPEND)\n");
 			break;
 		case USB_PORT_FEAT_POWER:
-			dev_info(hcd->self.controller, "ue11h_hub_control: USB_PORT_FEAT_POWER (power on)\n");
+			dev_dbg(hcd->self.controller,
+				"ue11h_hub_control: USB_PORT_FEAT_POWER (power on)\n");
 			ue11->port1 |= USB_PORT_STAT_CONNECTION;
 			ue11->port1 |= USB_PORT_STAT_C_CONNECTION << 16;
 			break;
@@ -1476,7 +1482,8 @@ static int ue11h_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 			if (!(ue11->port1 & USB_PORT_STAT_POWER))
 				break;
 
-			dev_info(hcd->self.controller, "ue11h_hub_control: USB_PORT_FEAT_RESET\n");
+			dev_dbg(hcd->self.controller,
+				"ue11h_hub_control: USB_PORT_FEAT_RESET\n");
 
 			/* 50 msec of reset/SE0 signaling, irqs blocked */
 			ue11->irq_enable = 0;
@@ -1489,7 +1496,7 @@ static int ue11h_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 			goto error;
 		}
 		ue11->port1 |= 1 << wValue;
-		dev_info(hcd->self.controller, " - (Port=%x)\n", ue11->port1);
+		dev_dbg(hcd->self.controller, " - (Port=%x)\n", ue11->port1);
 		break;
 
 	default:
