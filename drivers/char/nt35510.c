@@ -1,5 +1,8 @@
 /*
- * Driver for nt35510
+ * Driver for nt35510, image should be raw RGB565 format.
+ * 
+ * Conversion command: ffmpeg -i <src_file> -vcodec rawvideo -f rawvideo -pix_fmt rgb565 <dst_file>
+ * Then, run `dd if=<dst_file> of=/dev/nt35510 bs=8`.
  *
  * Copyright (C) 2016-2019 Tsinghua University
  * Author: Zhang Yuxiang <zz593141477@gmail.com> Jiajie Chen <jiegec@qq.com>
